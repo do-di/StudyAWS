@@ -1,0 +1,335 @@
+Description: this tmplate deploy a website on EC2.
+Parameters:
+  EnvironmentName:
+    Description: dev
+    Type: String
+  
+  VpcCIDR:
+    Description: 10.0.0.0/16
+    Type: String
+    Default: 10.0.0.0/16
+
+  PublicSubnet1CIDR:
+    Description: 10.0.1.0/24
+    Type: String
+    Default: 10.0.1.0/24  
+
+  PublicSubnet2CIDR:
+    Description: 10.0.2.0/24
+    Type: String
+    Default: 10.0.2.0/24  
+
+  PrivateSubnet1CIDR:
+    Description: 10.0.3.0/24
+    Type: String
+    Default: 10.0.3.0/24  
+
+  PrivateSubnet2CIDR:
+    Description: 10.0.4.0/24
+    Type: String
+    Default: 10.0.4.0/24  
+
+  EC2KeyName:
+    Description: DeployAWebUsingEC2
+    Type: String
+    Default: DeployAWebUsingEC2
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCIDR
+      EnableDnsSupport: true
+      EnableDnsHostnames: false
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ1)
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Subnet (AZ2)
+  
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 0, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet1CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ1)
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      AvailabilityZone: !Select [ 1, !GetAZs  '' ]
+      CidrBlock: !Ref PrivateSubnet2CIDR
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Subnet (AZ2)
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Routes
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Routes
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet1
+
+  PublicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      SubnetId: !Ref PublicSubnet2
+
+  PrivateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet1
+
+  PrivateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      SubnetId: !Ref PrivateSubnet2
+
+  PublicSecutityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow to connect to the instance
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Public Security Group
+    
+  PrivateSecutityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow to connect to the instance
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} Private Security Group
+    
+  # PrivateInstance1:
+  #   Type: AWS::EC2::Instance
+  #   Properties:
+  #     ImageId: "ami-047126e50991d067b"
+  #     InstanceType: t2.micro
+  #     KeyName: !Ref EC2KeyName
+  #     SecurityGroupIds:
+  #       - !Ref PrivateSecutityGroup
+  #     SubnetId: !Ref PrivateSubnet1
+  #     UserData: 
+  #       Fn::Base64: |
+  #         #!/bin/bash
+  #         sudo apt update
+  #         sudo apt install -y nginx
+  #         sudo systemctl start nginx
+  #         sudo systemctl enable nginx
+  #         echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.html
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub ${EnvironmentName} Deploy A Web Using Ec2 in private 1
+
+  # PrivateInstance2:
+  #   Type: AWS::EC2::Instance
+  #   Properties:
+  #     ImageId: "ami-047126e50991d067b"
+  #     InstanceType: t2.micro
+  #     KeyName: !Ref EC2KeyName
+  #     SecurityGroupIds:
+  #       - !Ref DefaultSecutityGroup
+  #     SubnetId: !Ref PrivateSubnet2
+  #     UserData: 
+  #       Fn::Base64: |
+  #         #!/bin/bash
+  #         sudo apt update
+  #         sudo apt install -y nginx
+  #         sudo systemctl start nginx
+  #         sudo systemctl enable nginx
+  #         echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.html
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub ${EnvironmentName} Deploy A Web Using Ec2
+  
+  NATGatewayEIP1:
+    Type: AWS::EC2::EIP
+    Properties:
+        Domain: vpc
+
+  # NATGatewayEIP2:
+  #   Type: AWS::EC2::EIP
+  #   Properties:
+  #       Domain: vpc
+
+  NATGateway1:
+    Type: AWS::EC2::NatGateway
+    Properties:
+        AllocationId: !GetAtt NATGatewayEIP1.AllocationId
+        SubnetId: !Ref PublicSubnet1
+        Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName} NAT gateway 1
+
+  NATGatewayRoute1:
+    Type: AWS::EC2::Route
+    Properties:
+        RouteTableId: !Ref PrivateRouteTable
+        DestinationCidrBlock: 0.0.0.0/0
+        NatGatewayId: !Ref NATGateway1
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateName: website-launch-template
+      LaunchTemplateData:
+        ImageId: "ami-047126e50991d067b"
+        InstanceType: t2.micro
+        KeyName: !Ref EC2KeyName
+        SecurityGroupIds: 
+          - !Ref PublicSecutityGroup
+        UserData:
+          Fn::Base64: |
+            #!/bin/bash
+            sudo apt update
+            sudo apt install -y nginx
+            sudo systemctl start nginx
+            sudo systemctl enable nginx
+            echo "<h1>Hello World from $(hostname -f)</h1>" | sudo tee /var/www/html/index.html
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref EC2TargetGroup
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+      SecurityGroups:
+        - !GetAtt PublicSecutityGroup.GroupId
+
+  EC2TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 15
+      HealthyThresholdCount: 5
+      Matcher:
+        HttpCode: '200'
+      Name: EC2TargetGroup
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '20'
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref VPC
+
+  myASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MaxSize: '3'
+      MinSize: '2'
+      VPCZoneIdentifier:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+Outputs:
+  VPC:
+    Description: A reference to the created VPC
+    Value: !Ref  VPC
